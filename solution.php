@@ -1,17 +1,17 @@
 <?php
 
-const ADDRESS = 'https://test.amocrm.ru/private/api/v2/json';
+//const ADDRESS = 'https://test.amocrm.ru/private/api/v2/json';
 // для теста:
-//const ADDRESS = 'http://localhost:3000';
+const ADDRESS = 'http://localhost:3000';
 
 function SetEmptyTasks() {
 
   // чтобы обработать все сделки(если их больше 500)
   // будем итеративно обрабатывать их со смещением
-  $iterLeadsHeader = function($offsetLeads, $acc = []) use(&$iterLeadsHeader){
+  $getEmptyLeads = function($offsetLeads, $acc = []) use(&$getEmptyLeads){
     $leads = getLeads($offsetLeads);
     if (count($leads) == 0) {
-      return;
+      return $acc;
     }
     foreach ($leads as $lead) {
       // также с тасками:
@@ -26,10 +26,10 @@ function SetEmptyTasks() {
         }
       };
       if (!$iterHasOpenTask(0)) {
-        setEmptyTask($lead);
+        array_push($acc, $lead);
       }
     }
-    return $iterLeadsHeader($offsetLeads + count($leads));
+    return $getEmptyLeads($offsetLeads + count($leads), $acc);
   };
 
   function getLeads($offsetLeads) {
@@ -72,24 +72,24 @@ function SetEmptyTasks() {
     return count($filteredTasks) > 0;
   };
 
-  function setEmptyTask($lead) {
+  function setEmptyTask($leads) {
     sleep(1);
 
-    $task['request']['tasks']['add'] = array(
-      array(
+    $tasks['request']['tasks']['add'] = array_map(function($lead) {
+      return array(
         'element_id' => $lead['id'],
         'text' => 'Сделка без задачи',
         'status' => 0
-      )
-    );
+      );
+    }, $leads);
     $link = ADDRESS . '/tasks/set';
-    $curl = getCurl('POST', $link, $task);
+    $curl = getCurl('POST', $link, $tasks);
     $out = curl_exec($curl);
     $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
     curl_close($curl);
     handlerError($code);
     // debug print:
-    //print_r(parseResponse($out));
+    print_r(parseResponse($out));
   }
     
   function getCurl($method, $link, $data = null) {
@@ -140,7 +140,8 @@ function SetEmptyTasks() {
     return $result['response'];
   }
 
-  return $iterLeadsHeader(0);
+  $emptyLeads = $getEmptyLeads(0);
+  setEmptyTask($emptyLeads);
 }
 
 // предполагается, что мы уже авторизованы

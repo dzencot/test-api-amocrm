@@ -20,7 +20,7 @@ $leads = array_map(function($i) {
 $app = new Application();
 
 $app->get('/', function() use($leads) {
-  echo('Hello world!');
+  echo($leads);
 });
 
 $app->get('/leads/list', function() use($leads) {
@@ -52,19 +52,16 @@ $app->get('/tasks/list', function() use($leads) {
   return;
 });
 
-$app->post('/tasks/set', function() use($leads) {
+$app->post('/tasks/set', function() use(&$leads) {
   $jsonStr = file_get_contents("php://input");
   $req = json_decode($jsonStr);
-  $task = (Array) (((Array) (((Array) (((Array) $req)['request']))['tasks']))['add'][0]);
-  foreach ($leads as $lead) {
-    if ($lead->GetId() == $task['element_id']) {
-      $newTask = new Task($task['text']);
-      $lead->addTask($newTask);
-      echo(json_encode(array('response' => $task)));
-      return;
-    }
-  }
+  $tasks = (Array) (((Array) (((Array) (((Array) $req)['request']))['tasks']))['add']);
+  $parsedTasks = array_map(function($task) {
+    return (Array) $task;
+  }, $tasks);
+  // отсутствует логика добавления тасков
+  echo(json_encode(array('response' => array('tasks' => $parsedTasks))));
 });
- 
+
 $app->run();
 
