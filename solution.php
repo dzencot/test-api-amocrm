@@ -152,4 +152,4 @@ SetEmptyTasks();
  */
 
 // для теста написал небольшой сервер эмулирующий апи, есть в репозитории(включая этот файл):
-// https://github.dzencot/test-api-amocrm.git
+// https://github.com/dzencot/test-api-amocrm.git
