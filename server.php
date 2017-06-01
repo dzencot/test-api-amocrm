@@ -4,12 +4,23 @@ require_once 'Lead.php';
 require_once 'Task.php';
 
 const MAX_ARRAY = 500;
+$leads = array_map(function($i) {
+  $tasks = [];
+  if ($i % 2 == 0) {
+    //каждой второй сделке добавим задачу
+    $tasks = array_map(function() {
+      $task = new Task('hi');
+      $task->setStatusOn();
+      return $task;
+    }, range(1, 10));
+  }
+  return new Lead($tasks);
+}, range(1, 10));
 
-$leads =  
 $app = new Application();
 
 $app->get('/', function() use($leads) {
-  print_r($leads);
+  echo('Hello world!');
 });
 
 $app->get('/leads/list', function() use($leads) {
@@ -41,7 +52,7 @@ $app->get('/tasks/list', function() use($leads) {
   return;
 });
 
-$app->post('/tasks/set', function() use(&$leads) {
+$app->post('/tasks/set', function() use($leads) {
   $jsonStr = file_get_contents("php://input");
   $req = json_decode($jsonStr);
   $task = (Array) (((Array) (((Array) (((Array) $req)['request']))['tasks']))['add'][0]);
@@ -49,31 +60,11 @@ $app->post('/tasks/set', function() use(&$leads) {
     if ($lead->GetId() == $task['element_id']) {
       $newTask = new Task($task['text']);
       $lead->addTask($newTask);
+      echo(json_encode(array('response' => $task)));
+      return;
     }
   }
-  //print_r($leads);
 });
-
+ 
 $app->run();
 
-
-class Leads {
-
-  private $leads = [];
-
-  public function __construct() {
-    $this->leads = array_map(function($i) {
-      $tasks = [];
-      if ($i % 2 == 0) {
-        //каждой второй сделке добавим задачу
-        $tasks = array_map(function() {
-          $task = new Task('hi');
-          $task->setStatusOn();
-          return $task;
-        }, range(1, 10));
-      }
-      return new Lead($tasks);
-    }, range(1, 10));
-  }
-
-  public 

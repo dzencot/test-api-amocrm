@@ -1,57 +1,64 @@
 <?php
 
-//const ADDRESS = 'https://test.amocrm.ru/private/api/v2/json';
-const ADDRESS = 'http://localhost:3000';
+const ADDRESS = 'https://test.amocrm.ru/private/api/v2/json';
+// для теста:
+//const ADDRESS = 'http://localhost:3000';
 
 function SetEmptyTasks() {
 
-
   // чтобы обработать все сделки(если их больше 500)
   // будем итеративно обрабатывать их со смещением
-  $iterFunc = function($offsetLeads) use(&$iterFunc){
-    $leads = getLeads($offsetLeads)['leads'];
+  $iterLeadsHeader = function($offsetLeads, $acc = []) use(&$iterLeadsHeader){
+    $leads = getLeads($offsetLeads);
     if (count($leads) == 0) {
       return;
     }
     foreach ($leads as $lead) {
-      $emptyLead = !hasOpenTask($lead);
-      if ($emptyLead) {
+      // также с тасками:
+      $iterHasOpenTask = function($offsetTasks) use(&$iterTasksHeader, $lead) {
+        $tasks = getTasks($lead['id'], $offsetTasks);
+        if (count($tasks) == 0) {
+          return false;
+        } else if (hasOpenTask($tasks)) {
+          return true;
+        } else {
+          return $iterHasOpenTask($offsetTasks + count($tasks));
+        }
+      };
+      if (!$iterHasOpenTask(0)) {
         setEmptyTask($lead);
       }
     }
-    $iterFunc($offsetLeads + count($leads));
+    return $iterLeadsHeader($offsetLeads + count($leads));
   };
 
-  function getLeads($counterLeads) {
+  function getLeads($offsetLeads) {
     // в соответствии с правилами работы с API не более одного запроса в секунду,
     // (далее перед каждым запросом):
     sleep(1);
 
-    $link = ADDRESS . "/leads/list?limit_rows=500&limit_offset=$counterLeads";
+    $link = ADDRESS . "/leads/list?limit_rows=500&limit_offset=$offsetLeads";
     $curl = getCurl('GET', $link);
     $out = curl_exec($curl);
     $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
     curl_close($curl);
     handlerError($code);
-    $response = json_decode($out, true);
-    return $response['response'];
+    return parseResponse($out)['leads'];
   }
 
-  function getTasks($leadId) {
+  function getTasks($leadId, $offsetTasks) {
     sleep(1);
 
-    $link = ADDRESS . "/tasks/list?type=lead&element_id=$leadId";
+    $link = ADDRESS . "/tasks/list?type=lead&element_id=$leadId&limit_rows=500&limit_offset=$offsetTasks";
     $curl = getCurl('GET', $link);
     $out = curl_exec($curl);
     $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
     curl_close($curl);
     handlerError($code);
-    $response = json_decode($out, true);
-    return $response['response'];
+    return parseResponse($out)['tasks'];
   }
 
-  function hasOpenTask($lead) {
-    $tasks = getTasks($lead['id'])['tasks'];
+  function hasOpenTask($tasks) {
     if (count($tasks) == 0) {
       return false;
     }
@@ -71,7 +78,7 @@ function SetEmptyTasks() {
     $task['request']['tasks']['add'] = array(
       array(
         'element_id' => $lead['id'],
-        'text' => 'Lead without tasks',
+        'text' => 'Сделка без задачи',
         'status' => 0
       )
     );
@@ -81,7 +88,8 @@ function SetEmptyTasks() {
     $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
     curl_close($curl);
     handlerError($code);
-    //print_r($out);
+    // debug print:
+    //print_r(parseResponse($out));
   }
     
   function getCurl($method, $link, $data = null) {
@@ -127,22 +135,21 @@ function SetEmptyTasks() {
     }
   }
 
-  return $iterFunc(0);
+  function parseResponse($data) {
+    $result = json_decode($data, true);
+    return $result['response'];
+  }
+
+  return $iterLeadsHeader(0);
 }
 
-function print_result() {
-  $link = ADDRESS;
-  $curl = curl_init();
-  curl_setopt($curl, CURLOPT_URL, $link);
-  $out = curl_exec($curl);
-  curl_close($curl);
-  $response = json_decode($out, true);
-  print_r($response['response']);
-}
-print("Before:\n");
-print_result();
-// предполагаю, что мы уже авторизованы
+// предполагается, что мы уже авторизованы
 SetEmptyTasks();
-print("After:\n");
-print_result();
 
+/* TODO:
+ * - учитывая время жизни сессии, скрипт ограничевается максимум 900 запросами
+ * - скрипт не протестирован на больших объемах данных(более 500 сделок и задач)
+ */
+
+// для теста написал небольшой сервер эмулирующий апи, есть в репозитории(включая этот файл):
+// https://github.dzencot/test-api-amocrm.git
